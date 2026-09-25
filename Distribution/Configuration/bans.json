@@ -1,0 +1,6 @@
+{
+  "reportRateLimitTrips": true,
+  "autoBanDuration": "04:00:00",
+  "reportBadConnects": true,
+  "badConnectDuration": "04:00:00"
+}

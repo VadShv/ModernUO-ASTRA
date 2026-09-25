@@ -1,0 +1,9 @@
+{
+  "lapiUrl": "http://127.0.0.1:8080",
+  "machineId": "",
+  "password": "",
+  "origin": "modernuo",
+  "manualBanDuration": "7.00:00:00",
+  "flushInterval": "00:00:01",
+  "maxQueue": 10000
+}

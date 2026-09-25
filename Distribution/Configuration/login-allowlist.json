@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "file": "Configuration/login-allowlist.txt",
+  "ttl": "90.00:00:00",
+  "flushInterval": "01:00:00",
+  "escalateAfterStrikes": 10,
+  "strikeWindow": "01:00:00"
+}
