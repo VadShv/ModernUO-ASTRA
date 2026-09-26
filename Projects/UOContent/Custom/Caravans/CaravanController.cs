@@ -160,12 +160,21 @@ public class CaravanController
         var dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
         if (dist == 0) return;
 
-        var speed = Math.Min(dist, 3);
-        var nx = loc.X + (int)(dx * (double)speed / dist) + (offset % 3 - 1);
-        var ny = loc.Y + (int)(dy * (double)speed / dist) + (offset / 3 - 1);
-        var nz = _map.GetAverageZ(nx, ny);
+        var dir = m.GetDirectionTo(target.X, target.Y);
 
-        m.Location = new Point3D(nx, ny, nz);
+        if (!m.Move(dir))
+        {
+            var left = (Direction)(((int)dir - 1) & 0x07);
+            if (!m.Move(left))
+            {
+                var right = (Direction)(((int)dir + 1) & 0x07);
+                if (!m.Move(right))
+                {
+                    var around = (Direction)(((int)dir + 2) & 0x07);
+                    m.Move(around);
+                }
+            }
+        }
     }
 
     private void CheckAmbush()
