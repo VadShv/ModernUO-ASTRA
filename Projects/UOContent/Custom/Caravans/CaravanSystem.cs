@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Server;
 using Server.Logging;
+using Server.Network;
 
 namespace Server.Custom.Caravans;
 
@@ -63,6 +64,8 @@ public static class CaravanSystem
 
             logger.Information("CaravanSystem: Spawned caravan '{Route}'. Active: {Active}/{Max}.",
                 route.Name, _activeCaravans.Count, _maxConcurrentCaravans);
+
+            AnnounceCaravan(route);
         }
         catch (Exception ex)
         {
@@ -72,4 +75,20 @@ public static class CaravanSystem
 
     public static int ActiveCount => _activeCaravans.Count;
     public static IReadOnlyList<CaravanController> ActiveCaravans => _activeCaravans;
+
+    private static void AnnounceCaravan(CaravanRoute route)
+    {
+        var parts = route.Name.Split('-');
+        var from = parts.Length > 0 ? parts[0] : "Unknown";
+        var to = parts.Length > 1 ? parts[1] : "Unknown";
+        var msg = $"[Caravan] A caravan is departing from {from} to {to}! Reward: {route.GuardReward} gold for guards. Say 'guard' near the merchant to join.";
+
+        foreach (var ns in NetState.Instances)
+        {
+            if (ns.Mobile != null && ns.Mobile.Alive)
+            {
+                ns.Mobile.SendMessage(0x3B, msg);
+            }
+        }
+    }
 }
