@@ -37,50 +37,73 @@ public class CaravanRoute
         var routes = new List<CaravanRoute>();
 
         routes.Add(new CaravanRoute("Britain-Yew",
-            new Point3D(1330, 1597, 0),
+            new Point3D(1270, 1600, 0),
             new Point3D(527, 1093, 0),
             500,
-            new Point3D(1100, 1500, 0),
-            new Point3D(900, 1300, 0),
-            new Point3D(700, 1200, 0)
+            new Point3D(1200, 1580, 0),
+            new Point3D(1150, 1550, 0),
+            new Point3D(1100, 1520, 0),
+            new Point3D(1050, 1500, 0),
+            new Point3D(1000, 1450, 0),
+            new Point3D(950, 1400, 0),
+            new Point3D(900, 1350, 0),
+            new Point3D(850, 1300, 0),
+            new Point3D(800, 1250, 0),
+            new Point3D(750, 1200, 0),
+            new Point3D(700, 1150, 0),
+            new Point3D(650, 1120, 0),
+            new Point3D(600, 1110, 0),
+            new Point3D(550, 1100, 0)
         ));
 
         routes.Add(new CaravanRoute("Britain-Trinsic",
-            new Point3D(1645, 1597, 0),
+            new Point3D(1270, 1620, 0),
             new Point3D(1823, 2821, 0),
             600,
-            new Point3D(1700, 1900, 0),
-            new Point3D(1700, 2200, 0),
-            new Point3D(1800, 2500, 0)
+            GenerateWaypoints(new Point3D(1270, 1620, 0), new Point3D(1823, 2821, 0), 50)
         ));
 
         routes.Add(new CaravanRoute("Britain-Minoc",
-            new Point3D(1645, 1500, 0),
+            new Point3D(1270, 1600, 0),
             new Point3D(2449, 417, 5),
             700,
-            new Point3D(1800, 1200, 0),
-            new Point3D(2000, 800, 0),
-            new Point3D(2300, 500, 0)
+            GenerateWaypoints(new Point3D(1270, 1600, 0), new Point3D(2449, 417, 5), 50)
         ));
 
         routes.Add(new CaravanRoute("Yew-Vesper",
             new Point3D(527, 1093, 0),
             new Point3D(2895, 678, 0),
             800,
-            new Point3D(1000, 1000, 0),
-            new Point3D(1800, 800, 0),
-            new Point3D(2500, 700, 0)
+            GenerateWaypoints(new Point3D(527, 1093, 0), new Point3D(2895, 678, 0), 50)
         ));
 
         routes.Add(new CaravanRoute("Trinsic-Vesper",
             new Point3D(1850, 2745, 0),
             new Point3D(2895, 678, 0),
             750,
-            new Point3D(2200, 2500, 0),
-            new Point3D(2600, 1800, 0),
-            new Point3D(2800, 1200, 0)
+            GenerateWaypoints(new Point3D(1850, 2745, 0), new Point3D(2895, 678, 0), 50)
         ));
 
         return routes;
+    }
+
+    private static Point3D[] GenerateWaypoints(Point3D start, Point3D end, int step)
+    {
+        var points = new List<Point3D>();
+        var dx = end.X - start.X;
+        var dy = end.Y - start.Y;
+        var dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
+        var count = Math.Max(1, dist / step);
+
+        for (var i = 1; i < count; i++)
+        {
+            var t = (double)i / count;
+            var x = (int)(start.X + dx * t);
+            var y = (int)(start.Y + dy * t);
+            var z = (int)(start.Z + (end.Z - start.Z) * t);
+            points.Add(new Point3D(x, y, z));
+        }
+
+        return points.ToArray();
     }
 }

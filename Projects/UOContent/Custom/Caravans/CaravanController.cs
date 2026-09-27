@@ -36,7 +36,7 @@ public class CaravanController
     {
         _route = route;
         _map = map;
-        _movementTimer = Timer.DelayCall(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3), OnMoveTick);
+        _movementTimer = Timer.DelayCall(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), OnMoveTick);
         _ambushTimer = Timer.DelayCall(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30), CheckAmbush);
     }
 
@@ -65,6 +65,10 @@ public class CaravanController
             FillCargo();
 
             _state = CaravanState.Traveling;
+            foreach (var m in _members)
+            {
+                if (m is BaseCreature bc) bc.AIObject?.AITimer.Stop();
+            }
             _movementTimer.Start();
             _ambushTimer.Start();
             _lastAmbush = Core.Now;
@@ -138,7 +142,7 @@ public class CaravanController
         if (merchantLoc == _lastMerchantLoc)
         {
             _stuckCounter++;
-            if (_stuckCounter >= 5)
+            if (_stuckCounter >= 15)
             {
                 logger.Warning("Caravan '{Route}' stuck at {Loc}, teleporting to waypoint {Index}.",
                     _route.Name, merchantLoc, _currentWaypoint);
@@ -156,12 +160,25 @@ public class CaravanController
 
         _lastMerchantLoc = merchantLoc;
 
-        MoveMember(_merchant, target, 0);
-        for (var i = 0; i < _members.Count; i++)
+        if (_state == CaravanState.Traveling)
         {
-            var m = _members[i];
-            if (m == _merchant || m.Deleted || !m.Alive) continue;
-            MoveMember(m, merchantLoc, i + 2);
+            for (var step = 0; step < 3; step++)
+            {
+                MoveMember(_merchant, target, 0);
+            }
+
+            for (var i = 0; i < _members.Count; i++)
+            {
+                var m = _members[i];
+                if (m == _merchant || m.Deleted || !m.Alive) continue;
+                if (GetDistance(m.Location, merchantLoc) > 5)
+                {
+                    for (var step = 0; step < 2; step++)
+                    {
+                        MoveMember(m, merchantLoc, i + 2);
+                    }
+                }
+            }
         }
 
         foreach (var guard in _playerGuards)
@@ -184,21 +201,19 @@ public class CaravanController
         var dist = Math.Max(Math.Abs(dx), Math.Abs(dy));
         if (dist == 0) return;
 
-        var dir = m.GetDirectionTo(target.X, target.Y);
+        var baseDir = (int)m.GetDirectionTo(target.X, target.Y) & 0x07;
 
-        if (!m.Move(dir))
+        for (var i = 0; i < 8; i++)
         {
-            var left = (Direction)(((int)dir - 1) & 0x07);
-            if (!m.Move(left))
-            {
-                var right = (Direction)(((int)dir + 1) & 0x07);
-                if (!m.Move(right))
-                {
-                    var around = (Direction)(((int)dir + 2) & 0x07);
-                    m.Move(around);
-                }
-            }
+            var tryDir = (Direction)((baseDir + i) & 0x07);
+            var before = m.Location;
+            m.Move(tryDir);
+            if (m.Location != before) return;
         }
+
+        var stepX = loc.X + Math.Sign(dx);
+        var stepY = loc.Y + Math.Sign(dy);
+        m.MoveToWorld(new Point3D(stepX, stepY, loc.Z), m.Map);
     }
 
     private void CheckAmbush()
@@ -217,6 +232,11 @@ public class CaravanController
     {
         _state = CaravanState.UnderAttack;
         _lastAmbush = Core.Now;
+
+        foreach (var m in _members)
+        {
+            if (m is BaseCreature bc) bc.AIObject?.AITimer.Activate();
+        }
 
         var banditCount = 2 + Utility.Random(3) + Math.Max(0, _playerGuards.Count - 1);
         var loc = _merchant.Location;
@@ -242,6 +262,10 @@ public class CaravanController
             if (_state == CaravanState.UnderAttack)
             {
                 _state = CaravanState.Traveling;
+                foreach (var m in _members)
+                {
+                    if (m.Alive && m is BaseCreature bc) bc.AIObject?.AITimer.Stop();
+                }
                 _merchant?.Say("The attack is over. Moving on.");
             }
         });
@@ -286,6 +310,11 @@ public class CaravanController
         _movementTimer.Stop();
         _ambushTimer.Stop();
 
+        foreach (var m in _members)
+        {
+            if (m is BaseCreature bc) bc.AIObject?.AITimer.Activate();
+        }
+
         _merchant?.Say("We have arrived! Thank you for the protection.");
 
         foreach (var guard in _playerGuards)
@@ -310,6 +339,11 @@ public class CaravanController
         _state = CaravanState.Destroyed;
         _movementTimer.Stop();
         _ambushTimer.Stop();
+
+        foreach (var m in _members)
+        {
+            if (m is BaseCreature bc) bc.AIObject?.AITimer.Activate();
+        }
 
         logger.Information("Caravan '{Route}' destroyed. Merchant killed.", _route.Name);
 
