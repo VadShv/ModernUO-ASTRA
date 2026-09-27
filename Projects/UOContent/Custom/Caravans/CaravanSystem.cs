@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Server;
+using Server.Items;
 using Server.Logging;
+using Server.Mobiles;
 using Server.Network;
 
 namespace Server.Custom.Caravans;
@@ -11,8 +13,6 @@ public static class CaravanSystem
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(CaravanSystem));
     private static readonly List<CaravanController> _activeCaravans = new();
-    private static Timer _spawnTimer;
-    private static int _maxConcurrentCaravans = 3;
 
     public static void Configure()
     {
@@ -24,16 +24,16 @@ public static class CaravanSystem
     {
         CleanupOrphanedCaravanNpcs();
 
-        logger.Information("CaravanSystem: Starting. Max concurrent caravans: {Max}.", _maxConcurrentCaravans);
+        logger.Information("CaravanSystem: Starting. Scheduled departures at 10:00 and 20:00 MSK.");
 
-        _spawnTimer = Timer.DelayCall(
-            TimeSpan.FromSeconds(30),
-            TimeSpan.FromMinutes(3),
-            TrySpawnCaravan
+        ScheduleNextDeparture();
+    }
+
+    private static void OnWorldSave()
+    {
+        _activeCaravans.RemoveAll(c =>
+            c.State == CaravanState.Arrived || c.State == CaravanState.Destroyed
         );
-        _spawnTimer.Start();
-
-        Timer.DelayCall(TimeSpan.FromSeconds(10), TrySpawnCaravan);
     }
 
     private static void CleanupOrphanedCaravanNpcs()
@@ -53,27 +53,68 @@ public static class CaravanSystem
         }
     }
 
-    private static void OnWorldSave()
+    private static void ScheduleNextDeparture()
     {
-        _activeCaravans.RemoveAll(c =>
-            c.State == CaravanState.Arrived || c.State == CaravanState.Destroyed
-        );
+        var nowUtc = DateTime.UtcNow;
+        var msk = nowUtc.AddHours(3);
+
+        int[] departHoursMsk = { 10, 20 };
+        int[] returnHoursMsk = { 13, 23 };
+
+        var nextDepart = FindNextTime(msk, departHoursMsk);
+        var nextReturn = FindNextTime(msk, returnHoursMsk);
+
+        if (nextDepart <= nextReturn)
+        {
+            var delay = nextDepart - msk;
+            logger.Information("CaravanSystem: Next departure in {Delay} (at {Time} MSK).",
+                delay, nextDepart.ToString("HH:mm"));
+            Timer.DelayCall(delay, () => SpawnScheduledCaravan(isReturn: false));
+        }
+        else
+        {
+            var delay = nextReturn - msk;
+            logger.Information("CaravanSystem: Next return caravan in {Delay} (at {Time} MSK).",
+                delay, nextReturn.ToString("HH:mm"));
+            Timer.DelayCall(delay, () => SpawnScheduledCaravan(isReturn: true));
+        }
     }
 
-    private static void TrySpawnCaravan()
+    private static DateTime FindNextTime(DateTime now, int[] hours)
+    {
+        foreach (var h in hours.OrderBy(h => h))
+        {
+            var target = new DateTime(now.Year, now.Month, now.Day, h, 0, 0);
+            if (target > now) return target;
+        }
+        return new DateTime(now.Year, now.Month, now.Day, hours[0], 0, 0).AddDays(1);
+    }
+
+    private static void SpawnScheduledCaravan(bool isReturn)
     {
         _activeCaravans.RemoveAll(c =>
             c.State == CaravanState.Arrived || c.State == CaravanState.Destroyed
         );
 
-        if (_activeCaravans.Count >= _maxConcurrentCaravans)
-        {
-            return;
-        }
-
         var routes = CaravanRoute.CreateDefaultRoutes();
-        var route = routes[Utility.Random(routes.Count)];
         var map = Map.Felucca;
+        var mskNow = DateTime.UtcNow.AddHours(3);
+
+        CaravanRoute route;
+        if (isReturn)
+        {
+            var returnRoutes = routes.Where(r => r.Name.StartsWith("Britain-")).ToList();
+            route = returnRoutes[Utility.Random(returnRoutes.Count)];
+            var dest = route.End;
+            route = new CaravanRoute($"Return-{route.Name.Split('-')[1]}-Britain",
+                dest, route.Start, route.GuardReward,
+                route.Waypoints.Skip(1).Take(route.Waypoints.Count - 2).Reverse().ToArray());
+        }
+        else
+        {
+            var departRoutes = routes.Where(r => r.Name.StartsWith("Britain-")).ToList();
+            route = departRoutes[Utility.Random(departRoutes.Count)];
+        }
 
         try
         {
@@ -81,26 +122,35 @@ public static class CaravanSystem
             controller.Start();
             _activeCaravans.Add(controller);
 
-            logger.Information("CaravanSystem: Spawned caravan '{Route}'. Active: {Active}/{Max}.",
-                route.Name, _activeCaravans.Count, _maxConcurrentCaravans);
+            var type = isReturn ? "returning to Britain" : "departing from Britain";
+            logger.Information("CaravanSystem: Scheduled caravan '{Route}' {Type} at {Time} MSK.",
+                route.Name, type, mskNow.ToString("HH:mm"));
 
-            AnnounceCaravan(route);
+            AnnounceCaravan(route, isReturn);
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "CaravanSystem: Failed to spawn caravan '{Route}'", route.Name);
+            logger.Error(ex, "CaravanSystem: Failed to spawn scheduled caravan '{Route}'", route.Name);
         }
+
+        ScheduleNextDeparture();
     }
 
-    public static int ActiveCount => _activeCaravans.Count;
-    public static IReadOnlyList<CaravanController> ActiveCaravans => _activeCaravans;
-
-    private static void AnnounceCaravan(CaravanRoute route)
+    private static void AnnounceCaravan(CaravanRoute route, bool isReturn)
     {
         var parts = route.Name.Split('-');
         var from = parts.Length > 0 ? parts[0] : "Unknown";
         var to = parts.Length > 1 ? parts[1] : "Unknown";
-        var msg = $"[Caravan] A caravan is departing from {from} to {to}! Reward: {route.GuardReward} gold for guards. Say 'guard' near the merchant to join.";
+        string msg;
+
+        if (isReturn)
+        {
+            msg = $"[Caravan] A caravan is returning from {from} to Britain! Guards needed. Say 'guard' near the merchant to join.";
+        }
+        else
+        {
+            msg = $"[Caravan] A caravan is departing from Britain to {to}! Reward: {route.GuardReward} gold. Say 'guard' near the merchant to join.";
+        }
 
         foreach (var ns in NetState.Instances)
         {
@@ -110,4 +160,72 @@ public static class CaravanSystem
             }
         }
     }
+
+    public static void OnCaravanArrived(CaravanController controller)
+    {
+        var arrivalLoc = controller.Route.End;
+        var map = Map.Felucca;
+
+        var vendors = new List<BaseVendor>();
+        foreach (var m in map.GetMobilesInRange<BaseVendor>(arrivalLoc, 100))
+        {
+            vendors.Add(m);
+        }
+
+        foreach (var vendor in vendors)
+        {
+            vendor.Restock();
+            AddBonusStock(vendor);
+        }
+
+        var cityName = controller.RouteName.Split('-').Last();
+        logger.Information("CaravanSystem: Caravan arrived at {City}. Restocked {Count} vendors.",
+            cityName, vendors.Count);
+
+        foreach (var ns in NetState.Instances)
+        {
+            if (ns.Mobile != null && ns.Mobile.Alive)
+            {
+                ns.Mobile.SendMessage(0x44,
+                    $"[Caravan] The caravan from {controller.RouteName.Split('-')[0]} has arrived in {cityName}! Local shops have been restocked with fresh goods.");
+            }
+        }
+    }
+
+    private static void AddBonusStock(BaseVendor vendor)
+    {
+        var pack = vendor.Backpack;
+        if (pack == null) return;
+
+        var bonusItems = new List<Item>();
+        var roll = Utility.Random(4);
+        switch (roll)
+        {
+            case 0:
+                for (var i = 0; i < 3; i++) bonusItems.Add(new Longsword());
+                for (var i = 0; i < 2; i++) bonusItems.Add(new Buckler());
+                break;
+            case 1:
+                for (var i = 0; i < 3; i++) bonusItems.Add(new ChainChest());
+                for (var i = 0; i < 2; i++) bonusItems.Add(new ChainLegs());
+                break;
+            case 2:
+                for (var i = 0; i < 5; i++) bonusItems.Add(new IronIngot(20));
+                for (var i = 0; i < 3; i++) bonusItems.Add(new Arrow(50));
+                break;
+            case 3:
+                for (var i = 0; i < 3; i++) bonusItems.Add(new PlateChest());
+                for (var i = 0; i < 2; i++) bonusItems.Add(new PlateArms());
+                bonusItems.Add(new Helmet());
+                break;
+        }
+
+        foreach (var item in bonusItems)
+        {
+            pack.DropItem(item);
+        }
+    }
+
+    public static int ActiveCount => _activeCaravans.Count;
+    public static IReadOnlyList<CaravanController> ActiveCaravans => _activeCaravans;
 }

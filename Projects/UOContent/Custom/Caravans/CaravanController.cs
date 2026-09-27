@@ -300,6 +300,8 @@ public class CaravanController
         logger.Information("Caravan '{Route}' arrived at destination. {GuardCount} player guards rewarded.",
             _route.Name, _playerGuards.Count);
 
+        CaravanSystem.OnCaravanArrived(this);
+
         Timer.DelayCall(TimeSpan.FromSeconds(10), Cleanup);
     }
 
