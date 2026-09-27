@@ -37,28 +37,28 @@ public class CaravanRoute
         var routes = new List<CaravanRoute>();
 
         routes.Add(new CaravanRoute("Britain-Yew",
-            new Point3D(1496, 1629, 10),
+            new Point3D(1330, 1597, 0),
             new Point3D(527, 1093, 0),
             500,
-            new Point3D(1200, 1500, 0),
+            new Point3D(1100, 1500, 0),
             new Point3D(900, 1300, 0),
             new Point3D(700, 1200, 0)
         ));
 
         routes.Add(new CaravanRoute("Britain-Trinsic",
-            new Point3D(1496, 1629, 10),
+            new Point3D(1645, 1597, 0),
             new Point3D(1823, 2821, 0),
             600,
-            new Point3D(1600, 1900, 0),
+            new Point3D(1700, 1900, 0),
             new Point3D(1700, 2200, 0),
             new Point3D(1800, 2500, 0)
         ));
 
         routes.Add(new CaravanRoute("Britain-Minoc",
-            new Point3D(1496, 1629, 10),
+            new Point3D(1645, 1500, 0),
             new Point3D(2449, 417, 5),
             700,
-            new Point3D(1700, 1200, 0),
+            new Point3D(1800, 1200, 0),
             new Point3D(2000, 800, 0),
             new Point3D(2300, 500, 0)
         ));
@@ -73,7 +73,7 @@ public class CaravanRoute
         ));
 
         routes.Add(new CaravanRoute("Trinsic-Vesper",
-            new Point3D(1823, 2821, 0),
+            new Point3D(1850, 2745, 0),
             new Point3D(2895, 678, 0),
             750,
             new Point3D(2200, 2500, 0),

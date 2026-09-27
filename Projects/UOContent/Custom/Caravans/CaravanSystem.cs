@@ -22,6 +22,8 @@ public static class CaravanSystem
 
     private static void OnServerStarted()
     {
+        CleanupOrphanedCaravanNpcs();
+
         logger.Information("CaravanSystem: Starting. Max concurrent caravans: {Max}.", _maxConcurrentCaravans);
 
         _spawnTimer = Timer.DelayCall(
@@ -32,6 +34,23 @@ public static class CaravanSystem
         _spawnTimer.Start();
 
         Timer.DelayCall(TimeSpan.FromSeconds(10), TrySpawnCaravan);
+    }
+
+    private static void CleanupOrphanedCaravanNpcs()
+    {
+        var count = 0;
+        foreach (var m in World.Mobiles.Values.ToList())
+        {
+            if (m is CaravanMerchant or CaravanGuardNPC)
+            {
+                m.Delete();
+                count++;
+            }
+        }
+        if (count > 0)
+        {
+            logger.Information("CaravanSystem: Cleaned up {Count} orphaned caravan NPCs.", count);
+        }
     }
 
     private static void OnWorldSave()

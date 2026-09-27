@@ -23,6 +23,8 @@ public class CaravanController
     private CaravanState _state = CaravanState.Forming;
     private DateTime _lastAmbush;
     private Mobile _merchant;
+    private Point3D _lastMerchantLoc;
+    private int _stuckCounter;
 
     public CaravanState State => _state;
     public CaravanRoute Route => _route;
@@ -124,6 +126,7 @@ public class CaravanController
         if (GetDistance(merchantLoc, target) <= 5)
         {
             _currentWaypoint++;
+            _stuckCounter = 0;
             if (_currentWaypoint < _route.Waypoints.Count)
             {
                 logger.Information("Caravan '{Route}' reached waypoint {Index}/{Total}.",
@@ -131,6 +134,27 @@ public class CaravanController
             }
             return;
         }
+
+        if (merchantLoc == _lastMerchantLoc)
+        {
+            _stuckCounter++;
+            if (_stuckCounter >= 5)
+            {
+                logger.Warning("Caravan '{Route}' stuck at {Loc}, teleporting to waypoint {Index}.",
+                    _route.Name, merchantLoc, _currentWaypoint);
+                var wp = _route.Waypoints[_currentWaypoint];
+                _merchant.MoveToWorld(GetNearbyLocation(wp, 5), _map);
+                _stuckCounter = 0;
+                _lastMerchantLoc = _merchant.Location;
+                return;
+            }
+        }
+        else
+        {
+            _stuckCounter = 0;
+        }
+
+        _lastMerchantLoc = merchantLoc;
 
         MoveMember(_merchant, target, 0);
         for (var i = 0; i < _members.Count; i++)
