@@ -75,7 +75,7 @@
     "pages.discordWebhookUrl": null,
     "pathfinding.enable": "True",
     "pathfinding.maxResidentChunks": "8192",
-    "pathfinding.maxSearchNodes": "1000",
+    "pathfinding.maxSearchNodes": "10000",
     "pathfinding.prebakeMaps": "False",
     "pathfinding.recorder.enable": "False",
     "pathfinding.recorder.path": "/home/user1/ModernUO-ASTRA/Distribution/Data/Pathfinding/recordings/pathfinds.jsonl",
